@@ -26,11 +26,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 # LangChain is split into small packages. Each import below maps to one concept.
-from langchain_core.documents import Document          # the unit of text + metadata
+from langchain_core.documents import Document  # the unit of text + metadata
 from langchain_text_splitters import RecursiveCharacterTextSplitter  # step 2
-from langchain_huggingface import HuggingFaceEmbeddings  # step 3 (runs locally, free)
-from langchain_chroma import Chroma                      # step 4 (local vector DB)
-from langchain_core.prompts import ChatPromptTemplate    # step 6
+from config import (
+    settings,
+    get_chat_model,
+    get_embeddings,
+)  # step 3 (runs locally, free)
+from langchain_chroma import Chroma  # step 4 (local vector DB)
+from langchain_core.prompts import ChatPromptTemplate  # step 6
 
 from config import settings, get_chat_model
 
@@ -41,11 +45,12 @@ from config import settings, get_chat_model
 # --------------------------------------------------------------------------- #
 @dataclass
 class LabState:
-    raw_text: str = ""                       # output of step 1
-    source_name: str = ""                    # where the text came from
+    raw_text: str = ""  # output of step 1
+    source_name: str = ""  # where the text came from
     chunks: list[Document] = field(default_factory=list)  # output of step 2
-    embeddings_model: Any = None             # the model used in step 3
-    vector_store: Chroma | None = None       # the DB from step 4
+    embeddings_model: Any = None  # the model used in step 3
+    embeddings_label: str = ""
+    vector_store: Chroma | None = None  # the DB from step 4
     # Settings the learner can change from the UI:
     chunk_size: int = 500
     chunk_overlap: int = 80
@@ -145,25 +150,20 @@ def embed_and_store() -> dict:
     started = time.time()
 
     # Load the embedding model once and reuse it.
+    # was: if state.embeddings_model is None: HuggingFaceEmbeddings(...)
     if state.embeddings_model is None:
-        state.embeddings_model = HuggingFaceEmbeddings(
-            model_name=settings.embedding_model,
-            encode_kwargs={"normalize_embeddings": True},
-        )
+        state.embeddings_model, state.embeddings_label = get_embeddings()
 
-    # Build a fresh in-memory collection from the current chunks.
     state.vector_store = Chroma.from_documents(
         documents=state.chunks,
         embedding=state.embeddings_model,
         collection_name="rag_lab",
     )
-
-    # For teaching: show what ONE embedding actually looks like.
     sample_vector = state.embeddings_model.embed_query(state.chunks[0].page_content)
 
     return {
         "chunks_embedded": len(state.chunks),
-        "model": settings.embedding_model,
+        "model": state.embeddings_label,  # <-- was settings.embedding_model
         "vector_dimensions": len(sample_vector),
         "sample_chunk_id": state.chunks[0].metadata["chunk_id"],
         "sample_vector_preview": [round(x, 4) for x in sample_vector[:12]],

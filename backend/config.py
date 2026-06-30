@@ -1,32 +1,25 @@
-"""
-config.py  --  All the knobs in one place.
-
-The key design decision for learning: EMBEDDING runs locally and free, so you
-can do steps 1-5 (the actual RAG retrieval) with zero API keys. Only the final
-GENERATION step needs a model. You can use Anthropic, OpenAI, a local Ollama
-model, or nothing at all (dry-run, which just shows you the prompt).
-"""
+"""config.py -- swappable embedding + chat providers (lazy imports)."""
 
 from __future__ import annotations
-
 import os
 from dataclasses import dataclass
-
 from dotenv import load_dotenv
 
-load_dotenv()  # read variables from a .env file in the project root
+load_dotenv()
 
 
 @dataclass
 class Settings:
-    # Local embedding model. Small (~90 MB), downloads once, runs on CPU.
-    # Swap for "sentence-transformers/all-mpnet-base-v2" for higher quality.
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "local").lower()
+    local_embedding_model: str = os.getenv(
+        "LOCAL_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
+    )
+    openai_embedding_model: str = os.getenv(
+        "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
+    )
+    voyage_embedding_model: str = os.getenv("VOYAGE_EMBEDDING_MODEL", "voyage-3-lite")
 
-    # Which provider to use for the GENERATE step. Options: anthropic | openai | ollama
     llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic").lower()
-
-    # Model names per provider (override in .env if you like).
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
@@ -35,38 +28,74 @@ class Settings:
 settings = Settings()
 
 
+def get_embeddings():
+    """Return (embeddings_object, label). Embeddings are required, so raise if a key is missing."""
+    provider = settings.embedding_provider
+    if provider == "local":
+        from langchain_huggingface import HuggingFaceEmbeddings
+
+        m = HuggingFaceEmbeddings(
+            model_name=settings.local_embedding_model,
+            encode_kwargs={"normalize_embeddings": True},
+        )
+        return m, f"local:{settings.local_embedding_model}"
+    if provider == "openai":
+        if not os.getenv("OPENAI_API_KEY"):
+            raise RuntimeError(
+                "EMBEDDING_PROVIDER=openai but OPENAI_API_KEY is not set."
+            )
+        from langchain_openai import OpenAIEmbeddings
+
+        return OpenAIEmbeddings(
+            model=settings.openai_embedding_model
+        ), f"openai:{settings.openai_embedding_model}"
+    if provider == "voyage":
+        if not os.getenv("VOYAGE_API_KEY"):
+            raise RuntimeError(
+                "EMBEDDING_PROVIDER=voyage but VOYAGE_API_KEY is not set."
+            )
+        from langchain_voyageai import VoyageAIEmbeddings
+
+        return VoyageAIEmbeddings(
+            model=settings.voyage_embedding_model
+        ), f"voyage:{settings.voyage_embedding_model}"
+    raise RuntimeError(
+        f"Unknown EMBEDDING_PROVIDER '{provider}' (use local | openai | voyage)."
+    )
+
+
 def get_chat_model():
-    """
-    Return (model, human_label, ready).
-
-    'ready' is False when the chosen provider has no credentials. In that case
-    the pipeline runs in dry-run mode and shows the assembled prompt instead of
-    calling a model -- so the rest of the lab still works without any key.
-    """
+    """Return (model, label, ready). ready=False -> pipeline runs in dry-run mode."""
     provider = settings.llm_provider
-
     try:
         if provider == "anthropic":
             if not os.getenv("ANTHROPIC_API_KEY"):
                 return None, f"anthropic:{settings.anthropic_model} (no key)", False
             from langchain_anthropic import ChatAnthropic
-            model = ChatAnthropic(model=settings.anthropic_model, temperature=0)
-            return model, f"anthropic:{settings.anthropic_model}", True
 
+            return (
+                ChatAnthropic(model=settings.anthropic_model, temperature=0),
+                f"anthropic:{settings.anthropic_model}",
+                True,
+            )
         if provider == "openai":
             if not os.getenv("OPENAI_API_KEY"):
                 return None, f"openai:{settings.openai_model} (no key)", False
             from langchain_openai import ChatOpenAI
-            model = ChatOpenAI(model=settings.openai_model, temperature=0)
-            return model, f"openai:{settings.openai_model}", True
 
+            return (
+                ChatOpenAI(model=settings.openai_model, temperature=0),
+                f"openai:{settings.openai_model}",
+                True,
+            )
         if provider == "ollama":
-            # Ollama runs locally; no key, but the server must be running.
             from langchain_ollama import ChatOllama
-            model = ChatOllama(model=settings.ollama_model, temperature=0)
-            return model, f"ollama:{settings.ollama_model}", True
 
-    except Exception as exc:  # missing package, bad config, etc.
+            return (
+                ChatOllama(model=settings.ollama_model, temperature=0),
+                f"ollama:{settings.ollama_model}",
+                True,
+            )
+    except Exception as exc:
         return None, f"{provider} (error: {exc})", False
-
     return None, f"unknown provider '{provider}'", False
