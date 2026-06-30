@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-title">
+      <h1>RAG&nbsp;LAB</h1>
+      <p>Watch retrieval-augmented generation happen, one stage at a time.</p>
+    </div>
+    <div id="provider" class="provider" title="The model used for the final answer">checking…</div>
+  </header>
+
+  <!-- SIGNATURE: the pipeline. Each node lights up and is clickable. -->
+  <nav class="pipeline" id="pipeline" aria-label="RAG pipeline stages">
+    <button class="stage" data-stage="load">
+      <span class="stage-num">01</span><span class="stage-name">Load</span>
+      <span class="stage-dot"></span>
+    </button>
+    <button class="stage" data-stage="chunk">
+      <span class="stage-num">02</span><span class="stage-name">Chunk</span>
+      <span class="stage-dot"></span>
+    </button>
+    <button class="stage" data-stage="embed">
+      <span class="stage-num">03</span><span class="stage-name">Embed</span>
+      <span class="stage-dot"></span>
+    </button>
+    <button class="stage" data-stage="store">
+      <span class="stage-num">04</span><span class="stage-name">Store</span>
+      <span class="stage-dot"></span>
+    </button>
+    <button class="stage" data-stage="retrieve">
+      <span class="stage-num">05</span><span class="stage-name">Retrieve</span>
+      <span class="stage-dot"></span>
+    </button>
+    <button class="stage" data-stage="generate">
+      <span class="stage-num">06</span><span class="stage-name">Generate</span>
+      <span class="stage-dot"></span>
+    </button>
+  </nav>
+
+  <main class="workbench">
+    <!-- LEFT: controls -->
+    <section class="controls">
+      <div class="panel">
+        <h2>1. Source</h2>
+        <p class="hint">Give the lab some text to learn from.</p>
+        <textarea id="sourceText" rows="6" placeholder="Paste any text here…"></textarea>
+        <div class="row">
+          <button id="btnLoadText" class="btn">Load pasted text</button>
+          <label class="btn btn-ghost">
+            Upload .txt / .md / .pdf
+            <input id="fileInput" type="file" accept=".txt,.md,.pdf" hidden />
+          </label>
+        </div>
+        <button id="btnSample" class="link">Load the sample document</button>
+      </div>
+
+      <div class="panel">
+        <h2>2. Knobs</h2>
+        <p class="hint">Change these, re-run, and watch retrieval change.</p>
+        <label class="knob">
+          Chunk size <output id="csVal">500</output>
+          <input id="chunkSize" type="range" min="100" max="1500" step="50" value="500" />
+        </label>
+        <label class="knob">
+          Chunk overlap <output id="coVal">80</output>
+          <input id="chunkOverlap" type="range" min="0" max="300" step="10" value="80" />
+        </label>
+        <label class="knob">
+          Chunks to retrieve (top-k) <output id="kVal">4</output>
+          <input id="topK" type="range" min="1" max="10" step="1" value="4" />
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>3. Ask</h2>
+        <p class="hint">Your question is embedded and matched against the chunks.</p>
+        <input id="question" type="text" placeholder="What does the document say about…?" />
+        <div class="row">
+          <button id="btnRunAll" class="btn btn-primary">Run whole pipeline ▸</button>
+        </div>
+        <details class="stepwise">
+          <summary>or step through manually</summary>
+          <div class="steprow">
+            <button class="btn btn-mini" data-step="chunk">Chunk</button>
+            <button class="btn btn-mini" data-step="embed">Embed + store</button>
+            <button class="btn btn-mini" data-step="retrieve">Retrieve</button>
+            <button class="btn btn-mini" data-step="generate">Generate</button>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- RIGHT: inspector -->
+    <section class="inspector">
+      <div class="inspector-head">
+        <span id="inspectorTitle">Inspector</span>
+        <span id="inspectorTag" class="tag"></span>
+      </div>
+      <div id="inspectorBody" class="inspector-body">
+        <div class="empty">
+          Load a source, type a question, and hit <b>Run whole pipeline</b>.
+          Then click any stage above to inspect exactly what it produced.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Local embeddings · LangChain · Chroma — open <code>backend/rag_pipeline.py</code> to read the six steps.
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
