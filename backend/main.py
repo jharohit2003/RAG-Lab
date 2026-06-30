@@ -73,9 +73,9 @@ def _read_upload(file: UploadFile) -> str:
 def _ok(fn, *args):
     try:
         return fn(*args)
-    except ValueError as exc:        # expected "do step X first" messages
+    except ValueError as exc:        
         raise HTTPException(400, str(exc))
-    except Exception as exc:          # anything unexpected
+    except Exception as exc:         
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 

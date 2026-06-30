@@ -163,7 +163,7 @@ def embed_and_store() -> dict:
 
     return {
         "chunks_embedded": len(state.chunks),
-        "model": state.embeddings_label,  # <-- was settings.embedding_model
+        "model": state.embeddings_label,  
         "vector_dimensions": len(sample_vector),
         "sample_chunk_id": state.chunks[0].metadata["chunk_id"],
         "sample_vector_preview": [round(x, 4) for x in sample_vector[:12]],

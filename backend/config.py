@@ -20,9 +20,10 @@ class Settings:
     voyage_embedding_model: str = os.getenv("VOYAGE_EMBEDDING_MODEL", "voyage-3-lite")
 
     llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic").lower()
-    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_embedding_model: str = os.getenv(
+        "OLLAMA_EMBEDDING_MODEL", "nomic-embed-text"
+    )
 
 
 settings = Settings()
@@ -39,6 +40,13 @@ def get_embeddings():
             encode_kwargs={"normalize_embeddings": True},
         )
         return m, f"local:{settings.local_embedding_model}"
+    if provider == "ollama":
+        from langchain_ollama import OllamaEmbeddings
+
+        m = OllamaEmbeddings(
+            model=settings.ollama_embedding_model, base_url=settings.ollama_base_url
+        )
+        return m, f"ollama:{settings.ollama_embedding_model}"
     if provider == "openai":
         if not os.getenv("OPENAI_API_KEY"):
             raise RuntimeError(
@@ -91,11 +99,12 @@ def get_chat_model():
         if provider == "ollama":
             from langchain_ollama import ChatOllama
 
-            return (
-                ChatOllama(model=settings.ollama_model, temperature=0),
-                f"ollama:{settings.ollama_model}",
-                True,
+            model = ChatOllama(
+                model=settings.ollama_model,
+                temperature=0,
+                base_url=settings.ollama_base_url,
             )
+            return model, f"ollama:{settings.ollama_model}", True
     except Exception as exc:
         return None, f"{provider} (error: {exc})", False
     return None, f"unknown provider '{provider}'", False
